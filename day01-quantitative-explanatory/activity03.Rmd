@@ -31,8 +31,10 @@ Remember that [Emil Hvitfeldt](https://www.emilhvitfeldt.com/) (of Posit) has pu
 - Run the `load-packages` code chunk or **knit** <img src="../README-img/knit-icon.png" alt="knit" width = "20"/> icon your Rmd document to verify that no errors occur.
 
 ```{r load-packages}
-
+library(tidymodels)
+library(tidyverse)
 ```
+
 
 Since we will be looking at many relationships graphically, it will be nice to not have to code each of these individually.
 `{GGally}` is an extension to `{ggplot2}` that reduces some of the complexities when combining multiple plots.
@@ -45,6 +47,9 @@ For example, [`GGally::ggpairs`](http://ggobi.github.io/ggally/articles/ggpairs.
   ```{r  eval = FALSE}
   install.packages("GGally")
   ```
+```{r}
+library(GGally)
+```
   
 - Once you have verified that `{GGally}` is installed, load it in the R chunk titled `load-packages`.
   
@@ -68,6 +73,22 @@ Create a new R code chunk below, with an appropriate title, that does the follow
 
 - Review the about page of the data set and select at least one additional numeric variables (hint: look for `<dbl>` or `<int>` designations) to describe its distribution. Remember to write your description.
 - You may also wish to do this for `pf_score` and `pf_expression_control` again to help you remember what you noticed last week.
+
+```{r}
+hfi <- read_csv("hfi.csv")
+hfi_2016 <- hfi %>% filter(year==2016)
+```
+```{r}
+library(skimr)
+skim(hfi_2016)
+```
+```{r, message=FALSE}
+hfi_2016 %>% ggplot(aes(x=ef_legal_protection))+geom_histogram()
+hfi_2016 %>% ggplot(aes(x=log(ef_legal_protection)))+geom_histogram()
+hfi_2016 %>% ggplot(aes(x=sqrt(ef_legal_protection)))+geom_histogram()
+```
+
+
 
 ## Pairwise relationships
 
@@ -99,9 +120,9 @@ Now, we will obtain graphical and numerical summaries to describe the pairwise r
 - Replace `explanatory` in the `select` line with the variable you identified above
 - Run your code chunk or knit your document.
   
-```{verbatim pairs-plot}
+```{r pairs-plot, warning=FALSE}
 hfi_2016 %>% 
-  select(pf_score, pf_expression_control, explanatory) %>% 
+  select(pf_score, pf_expression_control, ef_legal_protection) %>% 
   ggpairs()
 ```
 
@@ -116,12 +137,15 @@ After running the `pairs-plot` code, answer the following questions:
 1. For each pair of variables, how would you describe the relationship graphically?
   Do any of the relationships look linear?
   Are there any interesting/odd features (outliers, non-linear patterns, etc.)?
+  The relationship between `pf_score` and `pf_expression_control` indicates a strong linear relationship while the relationship between `pf_score` and `ef_legal_protection` shows moderate correlation.
 
 2. For each pair of variables, how would you describe the relationship numerically?
+Correlation between `pf_score` and `pf_expression_control` is 0.845 while correlation between `ef_legal_protection` and `pf_score` is 0.458.
 
 3. Are your two explanatory variables collinear (correlated)?
   Essentially, this means that adding more than one of these variables to the model would not add much value to the model.
   We will talk more on this issue in Activity 4 (other considerations in regression models).
+No, the model does not suffer from multi-collinearity.
 
 ## The multiple linear regression model
 
@@ -136,7 +160,7 @@ $$
 - Replace `explanatory`, similarly to what you did in your `pairs-plot` R code chunk.
 - Run your code chunk or knit your document.
   
-```{verbatim mlr-model}
+```{r mlr-model}
 #fit the mlr model
 lm_spec <- linear_reg() %>%
   set_mode("regression") %>%
@@ -145,7 +169,7 @@ lm_spec <- linear_reg() %>%
 lm_spec
 
 mlr_mod <- lm_spec %>% 
-fit(pf_score ~ pf_expression_control + explanatory, data = hfi_2016)
+fit(pf_score ~ pf_expression_control + ef_legal_protection, data = hfi_2016)
 
 # model output
 tidy(mlr_mod)
@@ -155,6 +179,10 @@ After doing this, answer the following questions:
 
 4. Using your output, write the complete estimated equation for this model.
   Remember in Activity 2 that this looked like:
+```{r}
+y_hat <- 3.81+.499*hfi_2016["pf_expression_control"]+.1253*hfi_2016["ef_legal_protection"]
+```
+  
 
 $$
 \hat{y} = b_0 + b_1 \times x_1
@@ -165,6 +193,7 @@ $$
 
 5. For each of the estimated parameters (the *y*-intercept and the slopes associated with each explanatory variable - three total), interpret these values in the context of this problem.
   That is, what do they mean for a "non-data" person?
+  For each unit increase of `pf_expression_control` the `pf_score` increases by 0.499.
 
 ## Challenge: 3-D plots
 
@@ -175,10 +204,20 @@ Ideally, this would be something that plays nicely with (looks similar to) `{ggp
 - Create a new R code chunk, with a descriptive name, and add your code to create this plot.
 
 After doing this, respond to the following prompt:
+```{r}
+library(plotly)
+plot_ly(x=hfi_2016$pf_expression_control,
+        y=hfi_2016$ef_legal_protection,
+        z=hfi_2016$pf_score, type="scatter3d", mode="markers")
+```
 
 6. Compare your 3-D scatterplot and the `GGally::ggpairs` output.
   Comment on the strengths and weaknesses of these two visualizations.
   Do both display on GitHub when you push your work there?
+  3D is superior because it allows one to analyze 3 variables and superimpose a regression plane but is more difficult to interpret. While the 2d plane can only analyze two variables, it's much easier to interpret.
+
+
+  
 
 # Day 2
 
@@ -207,7 +246,7 @@ Fortunately, we can create our own.
 - In the code chunk below titled `binary-pred`, replace "verbatim" with "r" just before the code chunk title.
 - Run your code chunk or knit your document.
   
-```{verbatim binary-pred}
+```{r binary-pred}
 hfi_2016 <- hfi_2016 %>%
   mutate(west_atlantic = if_else(
     region %in% c("North America", "Latin America & the Caribbean"),
@@ -216,13 +255,16 @@ hfi_2016 <- hfi_2016 %>%
   ))
 ```
 
-7. What is happening in the above code? What new variable did we create? How do you know it is new? What values does it take when?
 
+
+
+7. What is happening in the above code? What new variable did we create? How do you know it is new? What values does it take when?
+The code uses the mutate function to create a conditional column based on the evaluation of the ifelse function. The value is No if region is in North America, Latin America & the Caribbean, otherwise Yes.
 
 - In the code chunk below titled `qual-mlr`, replace "verbatim" with "r" just before the code chunk title.
 - Run your code chunk or knit your document.
 
-```{verbatim qual-mlr}
+```{r qual-mlr, warning=FALSE}
 # review any visual patterns
 hfi_2016 %>% 
   select(pf_score, west_atlantic, pf_expression_control) %>% 
@@ -248,15 +290,20 @@ However, there are often times when we choose to include variables in our model 
 Regardless, I encourage you to keep your readings of *DF* in mind - who will benefit by including this information; who will be hurt by including this information? 
 
 Also, when looking at your model (`tidy`) output, the `term` label for your qualitative explanatory variable look odd.
+```{r}
+qual_mod
+```
+
 Answer the following questions:
 
 8. What is the label that R assigned to this explanatory variable `term`?
-
+west_atlanticYes
 
 9. What information is represented here?
-
+It's a binary variable with either value 1 or 0.
 
 10. What information is missing here?
+It misses information of the specific location.
 
 
 Your are essentially fitting two models (or $k$ models, where $k$ is the number of levels in your qualitative variable).
@@ -270,11 +317,16 @@ You can change this reference level of a categorical variable, which is the leve
 Use `?relevel` to learn more.
 
 11. Write the estimated equation for your MLR model with a qualitative explanatory variable.
+y_hat <- 4.3771 - 0.1024 x west_atlantic +.5401 x pf_expression_control
+
+
 
 
 12. Now, for each level of your qualitative variable, write the simplified equation of the estimated line for that level. 
   Note that if your qualitative variable has two levels, you should have two simplified equations.
-
+  
+No -> y_hat <- 4.3771  +.5401 x pf_expression_control
+Yes -> y_hat <- 4.2747 + .5401 x pf_expression_control        
 
 
 The interpretation of the coefficients (parameter estimates) in multiple regression is slightly different from that of simple regression.
@@ -283,15 +335,37 @@ The estimate for the quantitative variable reflects how much change in the respo
 
 13. Interpret the parameter estimate for the reference level of your categorical variable in the context of your problem.
 Page 83 of the text can help here (or have me come chat with you).
-
+Regions in west atlantic have a lower pf_score by 0.1 on average compared to other regions with the pf_expression_control held constant.
 
 14. Interpret the parameter estimate for your quantitative variable in the context of your problem.
-
+A unit increase in pf_expression_control leads to an increase of pf_score by 0.5401
 
 ## Challenge: Multiple levels
 
 Below, create a new R code chunk (with a descriptive name) that fits a new model with the same response (`pf_score`) and quantitative explanatory variable (`pf_expression_control`), but now use a qualitative variable with more than two levels (say, `region`) and obtain the `tidy` model output.
 How does R appear to handle categorical variables with more than two levels?
+```{r}
+# review any visual patterns
+hfi_2016 %>% 
+  select(pf_score, region, pf_expression_control) %>% 
+  ggpairs()
+
+#fit the mlr model
+```
+
+```{r warning=FALSE}
+
+lm_spec <- linear_reg() %>%
+  set_mode("regression") %>%
+  set_engine("lm")
+
+qual_mod <- lm_spec %>% 
+  fit(pf_score ~ region + pf_expression_control, data = hfi_2016)
+
+# model output
+tidy(qual_mod)
+```
+North Africa and middle east Regions tend to have pf_score with constant pf_expression_control while western Europe tends to have a higher pf_score.
 
 
 
@@ -328,7 +402,7 @@ $$
 - In the code chunk below titled `int-mlr`, replace "verbatim" with "r" just before the code chunk title.
 - Run your code chunk or knit your document.
 
-```{verbatim int-mlr}
+```{r int-mlr}
 # review any visual patterns
 hfi_2016 %>% 
   select(pf_score, west_atlantic, pf_expression_control) %>% 
@@ -353,19 +427,29 @@ After doing this, answer the following question:
 
 15. When viewing the `tidy` output, notice that the interaction term is listed as `qualitativelevel:quantitative`.
   Referring back to Day 2 with how R displays qualitative variables, interpret what this syntax means.
+```{r}
+int_mod
+```
+An increase unit of pf_expression_control for a region in west Atlantic leads to a change of (-1.5979+.2750) in the `pf_score.`
+y=b0+b1x1+b2x2+b3x1x2
+-> y=(b0+b2)+(b3+b1)x2
+-> y=b0+b1x1
 
 
 16. Using page 100 of *ISLR* as a reference, if needed, and your work from Day 2, write the simplified equation of the line corresponding to each level of your qualitative explanatory variable.
 
+No -> y_hat <- 5.7214+pf_expression_control x 0.2961
+Yes -> y_hat <- 4.3985 + pf_expression_control x 0.2961
 
 17. For two observations with similar values of the quantitative , which level tends to have higher values of the response variable?
 
+Regions outside the west atlantic tend to have a higher value.
 
 18. Like you did in Day 1, assess the fit of this model (no need to do any formal hypothesis testing - we will explore this next).
   How does `int_mod`'s fit compare to `mlr_mod`?
   What did you use to compare these?
   Why?
-
+We do this by comparing the R^2 (coefficient of determination) between the two models.
 
 Recall our brief discussion on how many disciplines are moving away from $p$-values in favor of other methods.
 We will explore $p$-values these other methods later this semester, but we will practice our classical methods here.
@@ -376,10 +460,10 @@ One way to check this is to build our null model (no predictors) and then compar
 
 - In the code chunk below titled `mod-comp`, replace "verbatim" with "r" just before the code chunk title.
   
-```{verbatim mod-comp}
+```{r mod-comp}
 # null model
 null_mod <- lm_spec %>% 
-fit(response ~ 1, data = data)
+fit(pf_score ~ 1, data = hfi_2016)
 
 anova(
   extract_fit_engine(int_mod),
@@ -389,6 +473,8 @@ anova(
 
 19. Using your background knowledge of $F$ tests, what is the $F$ test statistic and $p$-value for this test?
   Based on an $\alpha = 0.05$ significant level, what should you conclude?
+We reject the null hypothesis. At least one of the coefficients is non-zero.
+
 
 
 
@@ -406,6 +492,9 @@ Because the interaction term is a combination of the other two variables, we sho
 20. What is the $t$ test statistic and $p$-value associated with this test?
   Based on an $\alpha = 0.05$ significant level, what should you conclude?
 
+```{r}
+
+```
 
 
 If your interaction term was not significant, you could consider removing it.
