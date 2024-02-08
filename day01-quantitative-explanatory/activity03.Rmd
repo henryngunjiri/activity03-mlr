@@ -204,7 +204,7 @@ Ideally, this would be something that plays nicely with (looks similar to) `{ggp
 - Create a new R code chunk, with a descriptive name, and add your code to create this plot.
 
 After doing this, respond to the following prompt:
-```{r}
+```{r eval=FALSE}
 library(plotly)
 plot_ly(x=hfi_2016$pf_expression_control,
         y=hfi_2016$ef_legal_protection,
